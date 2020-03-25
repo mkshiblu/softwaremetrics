@@ -22,15 +22,16 @@ import org.eclipse.jgit.revwalk.RevWalk;
  */
 public class AncestorChecker {
 
-	public static final String REPO_DIR = "F:\\New folder\\toy_proj";
+	public static final String REPO_DIR = "F:\\eclipse_workplace\\Cassandra";
+	public static final String START_COMMIT = "c7a8730447d38698e6b21cf5a3226cd059a543b6";
+	public static final String END_COMMIT = "0cd3b689597604982e6bb0c822ad300549638d17";
 
 	public static void main(String[] args) throws IOException {
 		System.out.println("AncestorChecker");
 
 		Repository repo = openRepository(REPO_DIR);
 
-		List<RevCommit> res = findCommits(repo, "4287d757eed9ba75e7261ea622f239f3d91dd86f",
-				"17875c60cd303f072bcfdb3aa59e9d612500c586");
+		List<RevCommit> res = findCommits(repo, START_COMMIT, END_COMMIT);
 
 		if (res != null) {
 			System.out.println("They are in same branch!! Path:");
@@ -68,7 +69,7 @@ public class AncestorChecker {
 
 				while (commit.getParents() != null) {
 					if (commit.getParentCount() > 1) {
-						System.out.println("Commit: " + commit.getId()
+						System.out.println(commit.getId()
 								+ " More than 1 parent found. Checking the first parent only");
 					}
 
