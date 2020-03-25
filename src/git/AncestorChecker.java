@@ -4,7 +4,10 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Stack;
 
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -24,14 +27,16 @@ public class AncestorChecker {
 
 	public static final String REPO_DIR = "F:\\eclipse_workplace\\Cassandra";
 	public static final String START_COMMIT = "c7a8730447d38698e6b21cf5a3226cd059a543b6";
-	public static final String END_COMMIT = "0cd3b689597604982e6bb0c822ad300549638d17";
+	public static final String END_COMMIT = "9eab2633cc194af7a6b04977c0f148a65a735189";
+	public static HashSet<String> visited = new HashSet<>();
 
 	public static void main(String[] args) throws IOException {
 		System.out.println("AncestorChecker");
 
 		Repository repo = openRepository(REPO_DIR);
 
-		List<RevCommit> res = findCommits(repo, START_COMMIT, END_COMMIT);
+		visited.clear();
+		List<RevCommit> res = findCommitsIfReachable(repo, START_COMMIT, END_COMMIT);
 
 		if (res != null) {
 			System.out.println("They are in same branch!! Path:");
@@ -44,7 +49,7 @@ public class AncestorChecker {
 	}
 
 	/**
-	 * Returns commits including the end commit (parent) if there is a path from
+	 * Returns commits including the start and end commit (parent) if there is a path from
 	 * commit id to its potential ancestor otherwise null;
 	 */
 	public static List<RevCommit> findCommits(Repository repo, String commitId, String ancestorId) {
@@ -92,6 +97,76 @@ public class AncestorChecker {
 		}
 
 		return isAncestor ? result : null;
+	}
+
+	public static List<RevCommit> findCommitsIfReachable(Repository repo, String commitId, String ancestorId) {
+		if (commitId.equals(ancestorId)) {
+			System.out.println("Start and end commit id must be different");
+			return null;
+		}
+
+		RevCommit startCommit, endCommit, commit, parent;
+		Stack<RevCommit> commitStack = new Stack<>();
+		boolean isAncestor = false;
+		List<RevCommit> result = new ArrayList<>();
+
+		try {
+			startCommit = getCommit(repo, ObjectId.fromString(commitId));
+			endCommit = getCommit(repo, ObjectId.fromString(ancestorId));
+
+			if (validate(startCommit, endCommit)) {
+				commitStack.push(startCommit);
+				while (!commitStack.isEmpty()) {
+					commit = commitStack.peek();
+
+					if (commit.getParents() != null) {
+						for (int i = 0; i < commit.getParents().length; i++) {
+							parent = getCommit(repo, commit.getParent(i));
+							if (parent.getId().equals(endCommit.getId())) {
+
+								result.add(parent);
+								isAncestor = true;
+
+								RevCommit currLevel = parent;
+								while (!commitStack.isEmpty()) {
+									currLevel = commitStack.pop();
+
+									if (commitStack.isEmpty() || isDirectParent(commitStack.peek(), currLevel)) {
+										result.add(currLevel);
+									}
+								}
+								break;
+							} else if (parent.getCommitTime() > 0
+									&& parent.getCommitTime() < endCommit.getCommitTime()) {
+								// gone too far
+							} else {
+								if (!visited.contains(parent.getName())) {
+									commitStack.push(parent);
+								}
+							}
+						}
+					}
+
+					visited.add(commit.getName());
+				}
+			}
+
+		} catch (Exception ex) {
+			ex.printStackTrace();
+		}
+
+		Collections.reverse(result);
+		return isAncestor ? result : null;
+	}
+
+	public static boolean isDirectParent(RevCommit commit, RevCommit parent) {
+		if (commit.getParents() != null) {
+			for (int i = 0; i < commit.getParents().length; i++) {
+				if (parent.getId().equals(commit.getParent(i).getId()))
+					return true;
+			}
+		}
+		return false;
 	}
 
 	/**
